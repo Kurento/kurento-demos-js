@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Disable favicon -->
+    <link rel="icon" href="data:," />
+
+    <title>kurento-player2many</title>
+  </head>
+
+  <body>
+    <h1>kurento-player2many</h1>
+    <p>
+      This demo connects 1 publisher PlayerEndpoint (which can play HTTP or RTSP
+      sources) to N consumer WebRtcEndpoints. Each consumer can let the SDP
+      Offer/Answer negotiate the video codec, or a specific codec can be forced.
+    </p>
+
+    <div>
+      <ul>
+        <li><button id="uiPublish">Create publisher</button></li>
+        <li>
+          <button id="uiConsume">Join as consumer (negotiate codec)</button>
+        </li>
+        <li>
+          <button id="uiConsumeVp8">Join as consumer (force VP8)</button>
+        </li>
+        <li>
+          <button id="uiConsumeH264">Join as consumer (force H.264)</button>
+        </li>
+      </ul>
+    </div>
+
+    <div>
+      Debug:
+      <ul>
+        <li><button id="uiDebugDot">Generate DOT file</button></li>
+      </ul>
+    </div>
+
+    <div>
+      <h2>Video</h2>
+      <video id="uiVideo" width="320px" autoplay playsinline></video>
+    </div>
+  </body>
+
+  <script src="client-bundle.js"></script>
+</html>

@@ -57,7 +57,7 @@ class Session {
   global.server.https = https;
 
   https.on("listening", () => {
-    console.log("Web server is listening, port:", CONFIG.https.port);
+    console.log(`Web server is listening on https://localhost:${CONFIG.https.port}`);
   });
   https.on("error", err => {
     console.error("HTTPS error:", err.message);

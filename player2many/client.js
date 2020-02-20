@@ -48,7 +48,7 @@ ui.debugDot.onclick = () => global.server.socket.emit("CLIENT_DEBUG_DOT");
 
 // ----------------------------------------------------------------------------
 
-window.onload = () => {
+window.addEventListener("load", function() {
   console.log("Page load, connect WebSocket");
   connectSocket();
 
@@ -60,12 +60,12 @@ window.onload = () => {
   } else {
     console.warn("webrtc-adapter is not loaded! an install or config issue?");
   }
-};
+});
 
-window.onbeforeunload = () => {
+window.addEventListener("beforeunload", function() {
   console.log("Page unload, close WebSocket");
   global.server.socket.close();
-};
+});
 
 // ----
 
@@ -133,8 +133,7 @@ function startConsumer(codecName) {
 
         if (codecName === "H264") {
           sdpOffer = sdpRemoveCodec(sdpOffer, "VP8");
-        }
-        else if (codecName === "VP8") {
+        } else if (codecName === "VP8") {
           sdpOffer = sdpRemoveCodec(sdpOffer, "H264");
         }
 

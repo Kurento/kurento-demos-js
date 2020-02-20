@@ -1,5 +1,7 @@
-# GitHub .gitignore for Node.js
-# =============================
+# GitHub's .gitignore for Node
+# ============================
+#
+# https://github.com/github/gitignore/blob/master/Node.gitignore
 
 # Logs
 logs
@@ -44,6 +46,9 @@ build/Release
 node_modules/
 jspm_packages/
 
+# Snowpack dependency directory (https://snowpack.dev/)
+web_modules/
+
 # TypeScript v1 declaration files
 typings/
 
@@ -87,7 +92,7 @@ dist
 
 # Gatsby files
 .cache/
-# Comment in the public line in if your project uses Gatsby and *not* Next.js
+# Comment in the public line in if your project uses Gatsby and not Next.js
 # https://nextjs.org/blog/next-9-1#public-directory-support
 # public
 
@@ -105,6 +110,10 @@ dist
 
 # TernJS port file
 .tern-port
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
 
 
 # Custom rules for this project

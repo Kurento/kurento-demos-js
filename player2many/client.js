@@ -51,6 +51,15 @@ ui.debugDot.onclick = () => global.server.socket.emit("CLIENT_DEBUG_DOT");
 window.onload = () => {
   console.log("Page load, connect WebSocket");
   connectSocket();
+
+  if ("adapter" in window) {
+    console.log(
+      // eslint-disable-next-line no-undef
+      `webrtc-adapter loaded, browser: '${adapter.browserDetails.browser}', version: '${adapter.browserDetails.version}'`
+    );
+  } else {
+    console.warn("webrtc-adapter is not loaded! an install or config issue?");
+  }
 };
 
 window.onbeforeunload = () => {

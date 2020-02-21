@@ -95,7 +95,14 @@ function connectSocket() {
 
   socket.on("SERVER_SDP_ANSWER", sdpAnswer => {
     console.log("SERVER_SDP_ANSWER, sdpAnswer:", sdpAnswer);
-    global.peer.processAnswer(sdpAnswer);
+    global.peer.processAnswer(sdpAnswer, (err) => {
+      if (err) {
+        console.error("ERROR:", err);
+        return;
+      }
+
+      startVideo(ui.video);
+    });
   });
 }
 
@@ -182,6 +189,28 @@ function sdpRemoveCodec(sdp, codecName) {
   //console.log("NEW sdpObj:\n%s", JSON.stringify(sdpObj, null, 2));
 
   return SdpTransform.write(sdpObj);
+}
+
+// ----------------------------------------------------------------------------
+
+/* Start playback on the <video> HTML element.
+ * Formerly the "autoplay" video tag attribute was used for this, but now has
+ * been rendered unreliable and should be considered deprecated. Modern browsers
+ * implement very restrictive policies to limit autoplay, so it is better to
+ * write code for it and be able to catch the possible errors that might occur.
+ * Ref: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/video
+ */
+function startVideo(videoTag)
+{
+  console.log("Calling video.play() now");
+  videoTag.play().catch((err) => {
+    if (err.name === 'NotAllowedError') {
+      console.error("[start] Browser doesn't allow playing video: " + err);
+    }
+    else {
+      console.error("[start] Error in video.play(): " + err);
+    }
+  });
 }
 
 // ----------------------------------------------------------------------------

@@ -6,3 +6,17 @@ Offer/Answer negotiate the video codec, or a specific codec can be forced.
 
 Note: Currently, the resource played by PlayerEndpoint is hardcoded in
 "server.js".
+
+
+
+## Run
+
+Run these commands:
+
+```sh
+npm install
+
+npm start
+```
+
+Then wait for a message such as "`Web server is listening on https://localhost:8080`", and direct your browser to that URL.

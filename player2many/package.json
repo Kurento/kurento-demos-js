@@ -18,7 +18,7 @@
   },
   "homepage": "https://www.kurento.org/",
   "dependencies": {
-    "browserify": "^16.5.0",
+    "browserify": "^16.5.1",
     "express": "^4.17.0",
     "kurento-client": "^6.0.0",
     "kurento-utils": "^6.0.0",

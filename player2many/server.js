@@ -16,13 +16,14 @@ const global = {
   server: {
     expressApp: null,
     https: null,
+    socket: null,
     socketServer: null
   },
 
   kurento: {
     client: null,
     pipeline: null,
-    playerEp: null
+    playerEndpoint: null
   },
 
   sessions: new Map() // "SessionId": Session
@@ -32,7 +33,7 @@ class Session {
   constructor(socket) {
     this.socket = socket;
     this.consumerData = {
-      webrtcEp: null,
+      webrtcEndpoint: null,
       iceCandidatesQueue: []
     };
   }
@@ -89,6 +90,7 @@ class Session {
       "WebSocket server connected, port: %s",
       socket.request.connection.remotePort
     );
+    global.server.socket = socket;
 
     socket.on("CLIENT_START_PUBLISH", handleStartPublish);
     socket.on("CLIENT_SDP_OFFER", sdpOffer => handleSdpOffer(socket, sdpOffer));
@@ -128,16 +130,18 @@ async function handleStartPublish() {
   global.kurento.pipeline = pipeline;
   console.log("Kurento pipeline created");
 
-  const playerEp = await pipeline.create("PlayerEndpoint", {
-    uri: "http://files.openvidu.io/video/format/sintel.webm",
+  const playerEndpoint = await pipeline.create("PlayerEndpoint", {
+    // uri: "http://files.openvidu.io/video/format/sintel.webm",
+    uri: "http://files.openvidu.io/video/format/fiware-ppp.webm",
     //uri: "rtsp://192.168.12.23:553/stream",
+
     useEncodedMedia: false
     //useEncodedMedia: true
   });
-  global.kurento.playerEp = playerEp;
+  global.kurento.playerEndpoint = playerEndpoint;
   console.log("Kurento PlayerEndpoint created");
 
-  playerEp.play();
+  playerEndpoint.play();
 }
 
 // ----------------------------------------------------------------------------
@@ -156,10 +160,10 @@ async function handleSdpOffer(socket, sdpOffer) {
 
   const pipeline = global.kurento.pipeline;
 
-  const webrtcEp = await pipeline.create("WebRtcEndpoint");
-  session.consumerData.webrtcEp = webrtcEp;
+  const webrtcEndpoint = await pipeline.create("WebRtcEndpoint");
+  session.consumerData.webrtcEndpoint = webrtcEndpoint;
 
-  webrtcEp.on("IceCandidateFound", event => {
+  webrtcEndpoint.on("IceCandidateFound", event => {
     const iceCandidate = KurentoClient.getComplexType("IceCandidate")(
       event.candidate
     );
@@ -170,12 +174,12 @@ async function handleSdpOffer(socket, sdpOffer) {
   const iceCandidatesQueue = session.consumerData.iceCandidatesQueue;
   while (iceCandidatesQueue.length) {
     const candidate = iceCandidatesQueue.shift();
-    webrtcEp.addIceCandidate(candidate);
+    webrtcEndpoint.addIceCandidate(candidate);
   }
 
   // Start the WebRtcEndpoint
-  const sdpAnswer = await webrtcEp.processOffer(sdpOffer);
-  webrtcEp.gatherCandidates(err => {
+  const sdpAnswer = await webrtcEndpoint.processOffer(sdpOffer);
+  webrtcEndpoint.gatherCandidates(err => {
     if (err) {
       console.error("ERROR:", err);
     }
@@ -185,13 +189,13 @@ async function handleSdpOffer(socket, sdpOffer) {
   socket.emit("SERVER_SDP_ANSWER", sdpAnswer);
 
   // Connect to the publisher
-  const playerEp = global.kurento.playerEp;
-  if (!playerEp) {
+  const playerEndpoint = global.kurento.playerEndpoint;
+  if (!playerEndpoint) {
     console.error("ERROR: Publisher endpoint doesn't exist");
     return;
   }
 
-  playerEp.connect(webrtcEp);
+  await playerEndpoint.connect(webrtcEndpoint);
 }
 
 // ----------------------------------------------------------------------------
@@ -207,8 +211,8 @@ async function handleIceCandidate(socket, candidate) {
 
   const iceCandidate = KurentoClient.getComplexType("IceCandidate")(candidate);
 
-  if (session.consumerData.webrtcEp) {
-    session.consumerData.webrtcEp.addIceCandidate(iceCandidate);
+  if (session.consumerData.webrtcEndpoint) {
+    session.consumerData.webrtcEndpoint.addIceCandidate(iceCandidate);
   } else {
     session.consumerData.iceCandidatesQueue.push(iceCandidate);
   }
@@ -225,12 +229,12 @@ async function handleDebugDot() {
     console.log("Saved DOT file: pipeline.dot");
   });
 
-  const playerDot = await global.kurento.playerEp.getElementGstreamerDot();
-  Fs.writeFile("player.dot", playerDot, err => {
+  const playerDot = await global.kurento.playerEndpoint.getElementGstreamerDot();
+  Fs.writeFile("playerEndpoint.dot", playerDot, err => {
     if (err) {
       console.error("ERROR:", err);
     }
-    console.log("Saved DOT file: player.dot");
+    console.log("Saved DOT file: playerEndpoint.dot");
   });
 }
 

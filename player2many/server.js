@@ -7,6 +7,22 @@ const Https = require("https");
 const KurentoClient = require("kurento-client");
 const SocketServer = require("socket.io");
 
+// Promisify some Kurento API methods that are still callback-based
+const Util = require("util");
+const MediaElement = require("kurento-client-core").abstracts.MediaElement;
+MediaElement.prototype.connect = Util.promisify(MediaElement.prototype.connect);
+const SdpEndpoint = require("kurento-client-core").abstracts.SdpEndpoint;
+SdpEndpoint.prototype.processOffer = Util.promisify(
+  SdpEndpoint.prototype.processOffer
+);
+const WebRtcEndpoint = require("kurento-client-elements").WebRtcEndpoint;
+WebRtcEndpoint.prototype.gatherCandidates = Util.promisify(
+  WebRtcEndpoint.prototype.gatherCandidates
+);
+WebRtcEndpoint.prototype.addIceCandidate = Util.promisify(
+  WebRtcEndpoint.prototype.addIceCandidate
+);
+
 // ----------------------------------------------------------------------------
 
 // Application state
@@ -34,7 +50,7 @@ class Session {
     this.socket = socket;
     this.consumerData = {
       webrtcEndpoint: null,
-      iceCandidatesQueue: [],
+      pendingCandidates: [],
     };
   }
 }
@@ -63,10 +79,10 @@ class Session {
     );
   });
   https.on("error", (err) => {
-    console.error("HTTPS error:", err.message);
+    console.error("HTTPS ERROR:", err.message);
   });
   https.on("tlsClientError", (err) => {
-    console.error("TLS error:", err.message);
+    console.error("TLS ERROR:", err.message);
   });
   https.listen(CONFIG.https.port);
 }
@@ -92,14 +108,18 @@ class Session {
     );
     global.server.socket = socket;
 
-    socket.on("CLIENT_START_PUBLISH", handleStartPublish);
-    socket.on("CLIENT_SDP_OFFER", (sdpOffer) =>
-      handleSdpOffer(socket, sdpOffer)
-    );
-    socket.on("CLIENT_ICE_CANDIDATE", (candidate) =>
-      handleIceCandidate(socket, candidate)
-    );
-    socket.on("CLIENT_DEBUG_DOT", handleDebugDot);
+    socket.on("CLIENT_START_PUBLISH", async () => {
+      await handleStartPublish();
+    });
+    socket.on("CLIENT_SDP_OFFER", async (sdpOffer) => {
+      await handleSdpOffer(socket, sdpOffer);
+    });
+    socket.on("CLIENT_ICE_CANDIDATE", async (candidate) => {
+      await handleIceCandidate(socket, candidate);
+    });
+    socket.on("CLIENT_DEBUG_DOT", async () => {
+      await handleDebugDot();
+    });
   });
 }
 
@@ -128,22 +148,40 @@ class Session {
 async function handleStartPublish() {
   const client = global.kurento.client;
 
-  const pipeline = await client.create("MediaPipeline");
+  let pipeline;
+  try {
+    pipeline = await client.create("MediaPipeline");
+  } catch (err) {
+    return console.error("Promise ERROR:", err);
+  }
   global.kurento.pipeline = pipeline;
   console.log("Kurento pipeline created");
 
-  const playerEndpoint = await pipeline.create("PlayerEndpoint", {
-    // uri: "http://files.openvidu.io/video/format/sintel.webm",
-    uri: "http://files.openvidu.io/video/format/fiware-ppp.webm",
-    //uri: "rtsp://192.168.12.23:553/stream",
+  let playerEndpoint;
+  try {
+    playerEndpoint = await pipeline.create("PlayerEndpoint", {
+      // uri: "http://files.openvidu.io/video/format/sintel.webm",
+      uri: "http://files.openvidu.io/video/format/fiware-ppp.webm",
+      // uri: "rtsp://192.168.1.2:553/stream",
 
-    useEncodedMedia: false,
-    //useEncodedMedia: true
-  });
+      useEncodedMedia: false,
+      //useEncodedMedia: true
+    });
+  } catch (err) {
+    return console.error("Promise ERROR:", err);
+  }
   global.kurento.playerEndpoint = playerEndpoint;
   console.log("Kurento PlayerEndpoint created");
 
-  playerEndpoint.play();
+  playerEndpoint.on("Error", (event) => {
+    console.error("PlayerEndpoint ERROR:", event);
+  });
+
+  try {
+    await playerEndpoint.play();
+  } catch (err) {
+    return console.error("Promise ERROR:", err);
+  }
 }
 
 // ----------------------------------------------------------------------------
@@ -151,19 +189,28 @@ async function handleStartPublish() {
 async function handleSdpOffer(socket, sdpOffer) {
   // Session handling
   const sessionId = socket.id;
-  if (global.sessions.has(sessionId)) {
-    console.warn("Skip adding session, already exists:", sessionId);
-    return;
-  }
-  const session = new Session(socket);
-  global.sessions.set(sessionId, session);
-
-  console.log("SDP Offer from App to KMS:\n%s", sdpOffer);
-
   const pipeline = global.kurento.pipeline;
 
-  const webrtcEndpoint = await pipeline.create("WebRtcEndpoint");
+  let session;
+  let webrtcEndpoint;
+
+  if (global.sessions.has(sessionId)) {
+    return console.warn("Skip adding session, already exists:", sessionId);
+  }
+
+  session = new Session(socket);
+  global.sessions.set(sessionId, session);
+
+  try {
+    webrtcEndpoint = await pipeline.create("WebRtcEndpoint");
+  } catch (err) {
+    return console.error("Promise ERROR:", err);
+  }
   session.consumerData.webrtcEndpoint = webrtcEndpoint;
+
+  webrtcEndpoint.on("Error", (event) => {
+    console.error("WebRtcEndpoint ERROR:", event);
+  });
 
   webrtcEndpoint.on("IceCandidateFound", (event) => {
     const iceCandidate = KurentoClient.getComplexType("IceCandidate")(
@@ -172,32 +219,44 @@ async function handleSdpOffer(socket, sdpOffer) {
     socket.emit("SERVER_ICE_CANDIDATE", iceCandidate);
   });
 
-  // Add ICE candidates that were received asynchronously
-  const iceCandidatesQueue = session.consumerData.iceCandidatesQueue;
-  while (iceCandidatesQueue.length) {
-    const candidate = iceCandidatesQueue.shift();
-    webrtcEndpoint.addIceCandidate(candidate);
-  }
-
-  // Start the WebRtcEndpoint
-  const sdpAnswer = await webrtcEndpoint.processOffer(sdpOffer);
-  webrtcEndpoint.gatherCandidates((err) => {
-    if (err) {
-      console.error("ERROR:", err);
-    }
-  });
-
-  console.log("SDP Answer from KMS to App:\n%s", sdpAnswer);
-  socket.emit("SERVER_SDP_ANSWER", sdpAnswer);
-
   // Connect to the publisher
   const playerEndpoint = global.kurento.playerEndpoint;
   if (!playerEndpoint) {
-    console.error("ERROR: Publisher endpoint doesn't exist");
-    return;
+    return console.error("ERROR: Publisher endpoint doesn't exist");
   }
 
-  await playerEndpoint.connect(webrtcEndpoint);
+  try {
+    await playerEndpoint.connect(webrtcEndpoint);
+  } catch (err) {
+    return console.error("Promise ERROR:", err);
+  }
+
+  // Start the WebRtcEndpoint
+  console.log("SDP Offer from App to KMS:\n%s", sdpOffer);
+
+  let sdpAnswer;
+  try {
+    sdpAnswer = await webrtcEndpoint.processOffer(sdpOffer);
+  } catch (err) {
+    return console.error("Promise ERROR:", err);
+  }
+
+  console.log("SDP Answer from KMS to App:\n%s", sdpAnswer);
+
+  try {
+    await webrtcEndpoint.gatherCandidates();
+  } catch (err) {
+    return console.error("Promise ERROR:", err);
+  }
+
+  // Add ICE candidates that might have been received asynchronously
+  const pendingCandidates = session.consumerData.pendingCandidates;
+  while (pendingCandidates.length) {
+    const candidate = pendingCandidates.shift();
+    await handleIceCandidate(socket, candidate);
+  }
+
+  socket.emit("SERVER_SDP_ANSWER", sdpAnswer);
 }
 
 // ----------------------------------------------------------------------------
@@ -211,30 +270,45 @@ async function handleIceCandidate(socket, candidate) {
   }
   const session = global.sessions.get(sessionId);
 
-  const iceCandidate = KurentoClient.getComplexType("IceCandidate")(candidate);
-
   if (session.consumerData.webrtcEndpoint) {
-    session.consumerData.webrtcEndpoint.addIceCandidate(iceCandidate);
+    const kmsCandidate = KurentoClient.getComplexType("IceCandidate")(
+      candidate
+    );
+    try {
+      await session.consumerData.webrtcEndpoint.addIceCandidate(kmsCandidate);
+    } catch (err) {
+      return console.error("Promise ERROR: {}, candidate: {}", err, candidate);
+    }
   } else {
-    session.consumerData.iceCandidatesQueue.push(iceCandidate);
+    session.consumerData.pendingCandidates.push(candidate);
   }
 }
 
 // ----------------------------------------------------------------------------
 
 async function handleDebugDot() {
-  const pipelineDot = await global.kurento.pipeline.getGstreamerDot();
+  let pipelineDot;
+  try {
+    pipelineDot = await global.kurento.pipeline.getGstreamerDot();
+  } catch (err) {
+    return console.error("Promise ERROR:", err);
+  }
   Fs.writeFile("pipeline.dot", pipelineDot, (err) => {
     if (err) {
-      console.error("ERROR:", err);
+      return console.error("ERROR:", err);
     }
     console.log("Saved DOT file: pipeline.dot");
   });
 
-  const playerDot = await global.kurento.playerEndpoint.getElementGstreamerDot();
+  let playerDot;
+  try {
+    playerDot = await global.kurento.playerEndpoint.getElementGstreamerDot();
+  } catch (err) {
+    return console.error("Promise ERROR:", err);
+  }
   Fs.writeFile("playerEndpoint.dot", playerDot, (err) => {
     if (err) {
-      console.error("ERROR:", err);
+      return console.error("ERROR:", err);
     }
     console.log("Saved DOT file: playerEndpoint.dot");
   });

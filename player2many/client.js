@@ -1,11 +1,7 @@
 "use strict";
 
 const CONFIG = require("./config");
-
-// const Util = require("util");
-// const KurentoUtils = Util.promisify(require("kurento-utils"));
 const KurentoUtils = require("kurento-utils");
-
 const SdpTransform = require("sdp-transform");
 const SocketClient = require("socket.io-client");
 
@@ -97,8 +93,7 @@ function connectSocket() {
     console.log("SERVER_SDP_ANSWER, sdpAnswer:", sdpAnswer);
     global.peer.processAnswer(sdpAnswer, (err) => {
       if (err) {
-        console.error("ERROR:", err);
-        return;
+        return console.error("ERROR:", err);
       }
 
       startVideo(ui.video);
@@ -128,14 +123,12 @@ function startConsumer(codecName) {
     options,
     (err) => {
       if (err) {
-        console.error("ERROR:", err);
-        return;
+        return console.error("ERROR:", err);
       }
 
       consumer.generateOffer((err, sdpOffer) => {
         if (err) {
-          console.error("ERROR:", err);
-          return;
+          return console.error("ERROR:", err);
         }
 
         if (codecName === "H264") {
@@ -204,9 +197,9 @@ function startVideo(videoTag) {
   console.log("Calling video.play() now");
   videoTag.play().catch((err) => {
     if (err.name === "NotAllowedError") {
-      console.error("[start] Browser doesn't allow playing video: " + err);
+      return console.error("[start] Browser doesn't allow playing video: " + err);
     } else {
-      console.error("[start] Error in video.play(): " + err);
+      return console.error("[start] Error in video.play(): " + err);
     }
   });
 }

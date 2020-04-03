@@ -17,16 +17,16 @@ const global = {
     expressApp: null,
     https: null,
     socket: null,
-    socketServer: null
+    socketServer: null,
   },
 
   kurento: {
     client: null,
     pipeline: null,
-    playerEndpoint: null
+    playerEndpoint: null,
   },
 
-  sessions: new Map() // "SessionId": Session
+  sessions: new Map(), // "SessionId": Session
 };
 
 class Session {
@@ -34,7 +34,7 @@ class Session {
     this.socket = socket;
     this.consumerData = {
       webrtcEndpoint: null,
-      iceCandidatesQueue: []
+      iceCandidatesQueue: [],
     };
   }
 }
@@ -51,7 +51,7 @@ class Session {
   const https = Https.createServer(
     {
       cert: Fs.readFileSync(CONFIG.https.cert),
-      key: Fs.readFileSync(CONFIG.https.certKey)
+      key: Fs.readFileSync(CONFIG.https.certKey),
     },
     expressApp
   );
@@ -62,10 +62,10 @@ class Session {
       `Web server is listening on https://localhost:${CONFIG.https.port}`
     );
   });
-  https.on("error", err => {
+  https.on("error", (err) => {
     console.error("HTTPS error:", err.message);
   });
-  https.on("tlsClientError", err => {
+  https.on("tlsClientError", (err) => {
     console.error("TLS error:", err.message);
   });
   https.listen(CONFIG.https.port);
@@ -81,11 +81,11 @@ class Session {
     serveClient: false,
     pingTimeout: CONFIG.https.wsPingTimeout,
     pingInterval: CONFIG.https.wsPingInterval,
-    transports: ["websocket"]
+    transports: ["websocket"],
   });
   global.server.socketServer = socketServer;
 
-  socketServer.on("connect", socket => {
+  socketServer.on("connect", (socket) => {
     console.log(
       "WebSocket server connected, port: %s",
       socket.request.connection.remotePort
@@ -93,8 +93,10 @@ class Session {
     global.server.socket = socket;
 
     socket.on("CLIENT_START_PUBLISH", handleStartPublish);
-    socket.on("CLIENT_SDP_OFFER", sdpOffer => handleSdpOffer(socket, sdpOffer));
-    socket.on("CLIENT_ICE_CANDIDATE", candidate =>
+    socket.on("CLIENT_SDP_OFFER", (sdpOffer) =>
+      handleSdpOffer(socket, sdpOffer)
+    );
+    socket.on("CLIENT_ICE_CANDIDATE", (candidate) =>
       handleIceCandidate(socket, candidate)
     );
     socket.on("CLIENT_DEBUG_DOT", handleDebugDot);
@@ -110,7 +112,7 @@ class Session {
 
   console.log("Connect with Kurento Media Server:", kurentoUrl);
 
-  const client = new KurentoClient(kurentoUrl, err => {
+  const client = new KurentoClient(kurentoUrl, (err) => {
     if (err) {
       console.error("Exit: Kurento Media Server not listening");
       process.exit(1);
@@ -135,7 +137,7 @@ async function handleStartPublish() {
     uri: "http://files.openvidu.io/video/format/fiware-ppp.webm",
     //uri: "rtsp://192.168.12.23:553/stream",
 
-    useEncodedMedia: false
+    useEncodedMedia: false,
     //useEncodedMedia: true
   });
   global.kurento.playerEndpoint = playerEndpoint;
@@ -163,7 +165,7 @@ async function handleSdpOffer(socket, sdpOffer) {
   const webrtcEndpoint = await pipeline.create("WebRtcEndpoint");
   session.consumerData.webrtcEndpoint = webrtcEndpoint;
 
-  webrtcEndpoint.on("IceCandidateFound", event => {
+  webrtcEndpoint.on("IceCandidateFound", (event) => {
     const iceCandidate = KurentoClient.getComplexType("IceCandidate")(
       event.candidate
     );
@@ -179,7 +181,7 @@ async function handleSdpOffer(socket, sdpOffer) {
 
   // Start the WebRtcEndpoint
   const sdpAnswer = await webrtcEndpoint.processOffer(sdpOffer);
-  webrtcEndpoint.gatherCandidates(err => {
+  webrtcEndpoint.gatherCandidates((err) => {
     if (err) {
       console.error("ERROR:", err);
     }
@@ -222,7 +224,7 @@ async function handleIceCandidate(socket, candidate) {
 
 async function handleDebugDot() {
   const pipelineDot = await global.kurento.pipeline.getGstreamerDot();
-  Fs.writeFile("pipeline.dot", pipelineDot, err => {
+  Fs.writeFile("pipeline.dot", pipelineDot, (err) => {
     if (err) {
       console.error("ERROR:", err);
     }
@@ -230,7 +232,7 @@ async function handleDebugDot() {
   });
 
   const playerDot = await global.kurento.playerEndpoint.getElementGstreamerDot();
-  Fs.writeFile("playerEndpoint.dot", playerDot, err => {
+  Fs.writeFile("playerEndpoint.dot", playerDot, (err) => {
     if (err) {
       console.error("ERROR:", err);
     }

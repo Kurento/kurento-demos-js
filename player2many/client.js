@@ -16,11 +16,11 @@ const SocketClient = require("socket.io-client");
 
 const global = {
   server: {
-    socket: null
+    socket: null,
   },
 
   // WebRTC peer connection(s) with Kurento
-  peer: null
+  peer: null,
 };
 
 // ----------------------------------------------------------------------------
@@ -37,7 +37,7 @@ const ui = {
   debugDot: document.getElementById("uiDebugDot"),
 
   // <video>
-  video: document.getElementById("uiVideo")
+  video: document.getElementById("uiVideo"),
 };
 
 ui.publish.onclick = () => global.server.socket.emit("CLIENT_START_PUBLISH");
@@ -48,7 +48,7 @@ ui.debugDot.onclick = () => global.server.socket.emit("CLIENT_DEBUG_DOT");
 
 // ----------------------------------------------------------------------------
 
-window.addEventListener("load", function() {
+window.addEventListener("load", function () {
   console.log("Page load, connect WebSocket");
   connectSocket();
 
@@ -62,7 +62,7 @@ window.addEventListener("load", function() {
   }
 });
 
-window.addEventListener("beforeunload", function() {
+window.addEventListener("beforeunload", function () {
   console.log("Page unload, close WebSocket");
   global.server.socket.close();
 });
@@ -76,7 +76,7 @@ function connectSocket() {
 
   const socket = SocketClient(serverUrl, {
     path: CONFIG.https.wsPath,
-    transports: ["websocket"]
+    transports: ["websocket"],
   });
   global.server.socket = socket;
 
@@ -84,16 +84,16 @@ function connectSocket() {
     console.log("WebSocket connected");
   });
 
-  socket.on("error", err => {
+  socket.on("error", (err) => {
     console.error("WebSocket error:", err);
   });
 
-  socket.on("SERVER_ICE_CANDIDATE", candidate => {
+  socket.on("SERVER_ICE_CANDIDATE", (candidate) => {
     console.log("SERVER_ICE_CANDIDATE, candidate:", candidate);
     global.peer.addIceCandidate(candidate);
   });
 
-  socket.on("SERVER_SDP_ANSWER", sdpAnswer => {
+  socket.on("SERVER_SDP_ANSWER", (sdpAnswer) => {
     console.log("SERVER_SDP_ANSWER, sdpAnswer:", sdpAnswer);
     global.peer.processAnswer(sdpAnswer, (err) => {
       if (err) {
@@ -118,15 +118,15 @@ function startConsumer(codecName) {
     localVideo: null,
     remoteVideo: ui.video,
     mediaConstraints: { audio: false, video: true },
-    onicecandidate: candidate => {
+    onicecandidate: (candidate) => {
       const socket = global.server.socket;
       socket.emit("CLIENT_ICE_CANDIDATE", candidate);
-    }
+    },
   };
 
   const consumer = new KurentoUtils.WebRtcPeer.WebRtcPeerRecvonly(
     options,
-    err => {
+    (err) => {
       if (err) {
         console.error("ERROR:", err);
         return;
@@ -159,30 +159,30 @@ function sdpRemoveCodec(sdp, codecName) {
 
   //console.log("OLD sdpObj:\n%s", JSON.stringify(sdpObj, null, 2));
 
-  const videoMedia = sdpObj.media.find(media => media["type"] == "video");
+  const videoMedia = sdpObj.media.find((media) => media["type"] == "video");
 
   // Get all "rtpmap" entries for the given codec
-  const codecmaps = videoMedia.rtp.filter(cmap => cmap.codec === codecName);
+  const codecmaps = videoMedia.rtp.filter((cmap) => cmap.codec === codecName);
   if (!codecmaps.length) {
     // Nothing to do: "codecName" is not present in the given SDP
     return sdp;
   }
 
   // Get the PayloadType(s) of the codec, and remove them from all arrays
-  codecmaps.forEach(cmap => {
+  codecmaps.forEach((cmap) => {
     const payload = cmap.payload;
 
-    videoMedia.rtp = videoMedia.rtp.filter(elem => elem.payload != payload);
+    videoMedia.rtp = videoMedia.rtp.filter((elem) => elem.payload != payload);
 
-    videoMedia.fmtp = videoMedia.fmtp.filter(elem => elem.payload != payload);
+    videoMedia.fmtp = videoMedia.fmtp.filter((elem) => elem.payload != payload);
 
     videoMedia.rtcpFb = videoMedia.rtcpFb.filter(
-      elem => elem.payload != payload
+      (elem) => elem.payload != payload
     );
 
     videoMedia.payloads = videoMedia.payloads
       .split(" ")
-      .filter(str => parseInt(str, 10) != payload)
+      .filter((str) => parseInt(str, 10) != payload)
       .join(" ");
   });
 
@@ -200,14 +200,12 @@ function sdpRemoveCodec(sdp, codecName) {
  * write code for it and be able to catch the possible errors that might occur.
  * Ref: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/video
  */
-function startVideo(videoTag)
-{
+function startVideo(videoTag) {
   console.log("Calling video.play() now");
   videoTag.play().catch((err) => {
-    if (err.name === 'NotAllowedError') {
+    if (err.name === "NotAllowedError") {
       console.error("[start] Browser doesn't allow playing video: " + err);
-    }
-    else {
+    } else {
       console.error("[start] Error in video.play(): " + err);
     }
   });

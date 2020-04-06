@@ -1,5 +1,8 @@
 "use strict";
 
+// Log whole objects instead of giving up after two levels of nesting
+require("util").inspect.defaultOptions.depth = null;
+
 const CONFIG = require("./config");
 const Express = require("express");
 const Fs = require("fs");
@@ -82,7 +85,11 @@ class Session {
     console.error("HTTPS ERROR:", err.message);
   });
   https.on("tlsClientError", (err) => {
-    console.error("TLS ERROR:", err.message);
+    if (err.message.includes("alert number 46")) {
+      // Ignore: this is the client browser rejecting our self-signed certificate
+    } else {
+      console.error("TLS ERROR:", err);
+    }
   });
   https.listen(CONFIG.https.port);
 }

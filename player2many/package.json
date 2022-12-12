@@ -16,7 +16,7 @@
   "bugs": {
     "url": "https://github.com/Kurento/bugtracker/issues"
   },
-  "homepage": "https://www.kurento.org/",
+  "homepage": "https://kurento.openvidu.io/",
   "dependencies": {
     "browserify": "^16.5.1",
     "express": "^4.17.0",
